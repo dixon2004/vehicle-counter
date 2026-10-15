@@ -49,7 +49,23 @@ def process_video(
 
     os.makedirs("output", exist_ok=True)
     output_path = os.path.join("output", output_name)
-    writer = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"avc1"), fps, (w, h))
+
+    codec_candidates = ["mp4v", "MJPG", "XVID", "avc1"] if output_name.lower().endswith(".mp4") else ["MJPG", "XVID", "mp4v", "avc1"]
+    writer = None
+    for codec in codec_candidates:
+        candidate_path = output_path
+        if os.path.exists(candidate_path):
+            os.remove(candidate_path)
+        writer = cv2.VideoWriter(candidate_path, cv2.VideoWriter_fourcc(*codec), fps, (w, h))
+        if writer.isOpened():
+            break
+        writer.release()
+        writer = None
+
+    if writer is None or not writer.isOpened():
+        raise RuntimeError(
+            "Unable to initialize video writer. The selected video format or codec is not supported on this machine."
+        )
 
     progress_bar = st.progress(0, text="Processing video...")
     progress_text = st.empty()
@@ -74,8 +90,8 @@ def process_video(
     progress_bar.empty()
     progress_text.empty()
 
-    if os.path.getsize(output_path) == 0:
-        raise RuntimeError("Output video is empty. Codec may not be supported.")
+    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError("Output video was not generated. The codec may not be supported on this machine.")
 
     return output_path, results
 
